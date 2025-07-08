@@ -11,7 +11,7 @@ from sklearn.metrics import r2_score
 from tensorflow.keras.models import load_model
 import pickle
 
-dataFrame = pd.read_excel("C:/Users/mehmetkombe/Desktop/Staj Anka/TensorFlow/bisiklet_verisi.xlsx")
+dataFrame = pd.read_excel("EXCEL_PATH2")
 
 # sbn.pairplot(dataFrame)
 
