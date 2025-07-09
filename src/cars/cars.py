@@ -9,66 +9,68 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.metrics import r2_score
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Dropout
 
+# .env dosyasını yükle
+load_dotenv()
+excel_path = os.getenv("EXCEL_PATH")
 
-
-
-
-load_dotenv()  # .env dosyasını yükler
-excel_path = os.getenv("EXCEL_PATH")  # .env içinden değeri alır
-
+# Veriyi oku
 dataFrame = pd.read_excel(excel_path)
 
+# Dağılım grafikleri
 sbn.displot(dataFrame["price"])
-sbn.countplot(dataFrame["year"])
-# plt.show()
+sbn.countplot(data=dataFrame, x="year")
 
+# Fiyatı en yüksek 131 aracı çıkar
+dataFrame = dataFrame.sort_values("price", ascending=False).iloc[131:]
+# 1970 verilerini temizle
+dataFrame = dataFrame[dataFrame["year"] != 1970]
 
-#aşağıdaki kod en yüksek 131 fiyatlı arabaları atlar (verfi temizliği için bunu yaparız standart sapmayı fazla etkilememesi için)
-ayiklanmisData=dataFrame.sort_values("price",ascending=False).iloc[131:]
-dataFrame=ayiklanmisData
-dataFrame=dataFrame[dataFrame.year!=1970]
+# transmission'ı one-hot encode et
+dataFrame = pd.get_dummies(dataFrame, columns=["transmission"], drop_first=True)
 
+# Hedef ve bağımsız değişkenleri ayır
+y = dataFrame["price"].values
+x = dataFrame.drop("price", axis=1).values
 
-# print(dataFrame.groupby("year").mean()["price"])
+# Eğitim ve test verilerini ayır
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=10)
 
-dataFrame=dataFrame.drop("transmission",axis=1)
+# Ölçeklendirme
+scaler = MinMaxScaler()
+x_train = scaler.fit_transform(x_train)
+x_test = scaler.transform(x_test)
 
-dataFrame.groupby("year").mean()["price"]
-
-y=dataFrame["price"].values
-x=dataFrame.drop("price",axis=1).values
-
-x_train, x_test, y_train, y_test =train_test_split(x,y,test_size=0.3,random_state=10)
-scaler=MinMaxScaler()
-x_train=scaler.fit_transform(x_train)
-x_test=scaler.transform(x_test)
-print(x_train.shape)
-
-model=Sequential()
-
-model.add(Dense(64, activation="relu"))
+# Model
+model = Sequential()
+model.add(Dense(128, activation="relu"))
+model.add(Dropout(0.2))  
+model.add(Dense(256, activation="relu"))
+# model.add(Dropout(0.4)) 
 model.add(Dense(128, activation="relu"))
 model.add(Dense(64, activation="relu"))
-
 model.add(Dense(1))
 
-model.compile(optimizer="adam",loss="mse")
+model.compile(optimizer="adam", loss="mse")
 
-model.fit(x=x_train, y=y_train, validation_data=(x_test, y_test), batch_size=250, epochs=500)
+early_stop = EarlyStopping(monitor="val_loss", mode="min", verbose=1, patience=25, restore_best_weights=True)
 
-# Test verileri ile tahmin yap
+# Eğit
+model.fit(x=x_train, y=y_train, validation_data=(x_test, y_test), batch_size=250, epochs=500, verbose=1)
+
+# Tahmin
 tahminler = model.predict(x_test)
 
-# R^2 doğruluk skoru
+# R2 skoru
 r2 = r2_score(y_test, tahminler)
 print("R² (Doğruluk Skoru):", r2)
 
-
-# Tahmin vs Gerçek Fiyat grafiği
-plt.figure(figsize=(10,6))
+# Grafik
+plt.figure(figsize=(10, 6))
 plt.scatter(y_test, tahminler)
-plt.plot(y_test, y_test, "r--")  # Doğru tahmin çizgisi
+plt.plot(y_test, y_test, "r--")
 plt.xlabel("Gerçek Fiyat")
 plt.ylabel("Tahmin Edilen Fiyat")
 plt.title("Gerçek vs Tahmin Edilen Araç Fiyatları")
